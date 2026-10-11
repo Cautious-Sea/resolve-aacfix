@@ -9,6 +9,7 @@ __pycache__/
 .ruff_cache/
 *.whl
 *.so
+!vendor/pylibs/capstone/lib/libcapstone.so
 *.o
 .venv/
 .agents/
