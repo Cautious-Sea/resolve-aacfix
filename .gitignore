@@ -1,6 +1,3 @@
-# Built payload -- produced by scripts/dev-setup.sh, shipped in release tarballs.
-/vendor/
-/prebuilt/
 
 # Build scratch
 /_ffmpeg/
@@ -13,6 +10,8 @@ __pycache__/
 *.whl
 *.so
 *.o
+.venv/
+.agents/
 
 # Tool build outputs
 /tools/cov

@@ -30,7 +30,7 @@ import sys
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
 from .elfmap import ElfMap
-from .sites import SIGNATURES, MKV_SIGNATURES
+from .sites import SIGNATURES, MKV_SIGNATURES, cmp_imm_reg
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -89,6 +89,10 @@ def resolve_addresses(buf, em):
                               f"'{insn.mnemonic} {insn.op_str}'") from e
 
     g1 = _sig("gate1_dispatch").locate(buf, em)      # '.mp3' cmp (anchor)
+    g1_reg = cmp_imm_reg(cs, g1, em, buf, 0x2e6d7033)
+    if not g1_reg:
+        raise LookupError(f"cannot identify gate1 fourcc register at "
+                          f"{va(g1):#x}")
     g2 = _sig("gate2_count").locate(buf, em)
     g3a = _sig("gate3a_fetch").locate(buf, em)
     g3b = _sig("gate3b_attach").locate(buf, em)
@@ -97,6 +101,7 @@ def resolve_addresses(buf, em):
     return {
         # gate1: match the '.mp3' cmp; AAC -> FFmpeg handler (the '.mp3' je target)
         "g1_site":    va(g1),
+        "g1_reg":     g1_reg,
         "g1_target":  target_of(g1 + 7, {"je"}),
         # gate2: after the insert_range call; rbx = map; call target = insert_range
         "after_call": va(g2 + 18),
@@ -194,7 +199,7 @@ def build_patch_args(a, mkv_addrs=None, probe_addr=None, mkv=False,
 
     args = [
         "-M", f"addr={a['g1_site']:#x}",
-        "-P", R("r15", AAC_FOURCC,   a["g1_target"]),
+        "-P", R(a["g1_reg"], AAC_FOURCC, a["g1_target"]),
         "-M", f"addr={a['a_site']:#x}",
         "-P", R("rcx", AAC_CODEC_ID, a["fetch"]),
         "-M", f"addr={a['b_site']:#x}",
@@ -285,7 +290,7 @@ def main(argv):
 
     print("resolved addresses:")
     for k, v in a.items():
-        print(f"  {k:12} 0x{v:x}")
+        print(f"  {k:12} {v:#x}" if isinstance(v, int) else f"  {k:12} {v}")
     print("\ne9tool:", " ".join(cmd[1:]))
     tail = [l for l in res.stdout.splitlines()
             if any(t in l for t in ("num_patched ", "error", "time_elapsed"))]
